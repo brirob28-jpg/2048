@@ -461,11 +461,16 @@ hr {
   margin-bottom: 0;
 }
 
-.restart-button {
+.restart-button, .ai-start-button, .ai-pause-button {
   @include button;
   display: block;
   text-align: center;
   float: right;
+  margin-left: 12px;
+}
+
+.ai-active {
+  background: #9f8b77;
 }
 
 .game-explanation {
@@ -512,18 +517,28 @@ hr {
 
   // Show intro and restart button side by side
   .game-intro {
-    width: 55%;
+    width: 100%;
     display: block;
     box-sizing: border-box;
     line-height: 1.65;
+    margin-bottom: 8px;
   }
 
-  .restart-button {
-    width: 42%;
+  .restart-button, .ai-start-button, .ai-pause-button {
+    width: 32%;
     padding: 0;
     display: block;
     box-sizing: border-box;
     margin-top: 2px;
+    margin-left: 2%;
+  }
+
+  .ai-start-button, .ai-pause-button {
+    font-size: 13px;
+  }
+
+  .ai-pause-button {
+    margin-left: 0;
   }
 
   // Render the game field at the right width
