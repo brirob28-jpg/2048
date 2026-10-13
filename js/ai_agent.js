@@ -390,6 +390,10 @@ AIAgent.prototype.tileRank = function (value) {
 };
 
 function AIAgentController(gameManager, aiAgent, options) {
+  if (gameManager.aiController) {
+    gameManager.aiController.disable();
+  }
+
   this.gameManager = gameManager;
   this.aiAgent = aiAgent;
   this.delay = options && options.delay || 300;
@@ -397,42 +401,87 @@ function AIAgentController(gameManager, aiAgent, options) {
   this.running = false;
   this.calculating = false;
   this.timer = null;
+  this.resumeAfterKeepPlaying = false;
 
-  this.startButton = document.querySelector(".ai-start-button");
-  this.pauseButton = document.querySelector(".ai-pause-button");
+  this.toggleButton = document.querySelector(".ai-toggle-button");
   this.restartButton = document.querySelector(".restart-button");
+  this.retryButton = document.querySelector(".retry-button");
+  this.keepPlayingButton = document.querySelector(".keep-playing-button");
   this.gameContainer = document.querySelector(".game-container");
+  this.disabled = false;
 
+  this.bindGameStateHooks();
   this.bindControls();
   this.bindManualInputLock();
+  this.gameManager.aiController = this;
+  this.handleGameStateChange();
   this.updateButtons();
 }
+
+AIAgentController.prototype.bindGameStateHooks = function () {
+  var self = this;
+  var actuate = this.gameManager.actuate;
+
+  this.gameManager.actuate = function () {
+    actuate.apply(this, arguments);
+    self.handleGameStateChange();
+  };
+};
 
 AIAgentController.prototype.bindControls = function () {
   var self = this;
 
-  if (this.startButton) {
-    this.startButton.addEventListener("click", function (event) {
+  if (this.toggleButton) {
+    this.toggleButton.addEventListener("click", function (event) {
+      if (self.disabled) {
+        return;
+      }
+
       event.preventDefault();
-      self.start();
+      self.toggle();
     });
   }
 
-  if (this.pauseButton) {
-    this.pauseButton.addEventListener("click", function (event) {
-      event.preventDefault();
-      self.pause();
-    });
-  }
+  this.gameManager.inputManager.on("restart", function () {
+    self.resetAutoplay();
+  });
 
   if (this.restartButton) {
     this.restartButton.addEventListener("click", function () {
-      self.pause();
+      self.resetAutoplay();
     }, true);
 
     this.restartButton.addEventListener("touchend", function () {
-      self.pause();
+      self.resetAutoplay();
     }, true);
+  }
+
+  if (this.retryButton) {
+    this.retryButton.addEventListener("click", function () {
+      self.resetAutoplay();
+    }, true);
+
+    this.retryButton.addEventListener("touchend", function () {
+      self.resetAutoplay();
+    }, true);
+  }
+
+  if (this.keepPlayingButton) {
+    this.keepPlayingButton.addEventListener("click", function () {
+      self.continueAfterWin();
+    });
+
+    this.keepPlayingButton.addEventListener("touchend", function () {
+      self.continueAfterWin();
+    });
+  }
+};
+
+AIAgentController.prototype.toggle = function () {
+  if (this.running) {
+    this.pause();
+  } else {
+    this.start();
   }
 };
 
@@ -454,7 +503,7 @@ AIAgentController.prototype.bindManualInputLock = function () {
   };
 
   document.addEventListener("keydown", function (event) {
-    if (self.running && movementKeys[event.which]) {
+    if (!self.disabled && self.running && movementKeys[event.which]) {
       event.preventDefault();
       event.stopImmediatePropagation();
     }
@@ -462,7 +511,7 @@ AIAgentController.prototype.bindManualInputLock = function () {
 
   if (this.gameContainer) {
     var blockSwipe = function (event) {
-      if (self.running) {
+      if (!self.disabled && self.running) {
         event.preventDefault();
         event.stopImmediatePropagation();
       }
@@ -478,11 +527,21 @@ AIAgentController.prototype.bindManualInputLock = function () {
 };
 
 AIAgentController.prototype.start = function () {
+  if (this.disabled) {
+    return;
+  }
+
   if (this.running) {
     return;
   }
 
+  if (this.gameManager.isGameTerminated()) {
+    this.handleGameStateChange();
+    return;
+  }
+
   this.running = true;
+  this.showToggle();
   this.updateButtons();
   this.scheduleNextMove(0);
 };
@@ -497,6 +556,88 @@ AIAgentController.prototype.pause = function () {
   }
 
   this.updateButtons();
+};
+
+AIAgentController.prototype.resetAutoplay = function () {
+  if (this.disabled) {
+    return;
+  }
+
+  this.resumeAfterKeepPlaying = false;
+  this.pause();
+  this.showToggle();
+  this.updateButtons();
+};
+
+AIAgentController.prototype.disable = function () {
+  this.disabled = true;
+  this.resumeAfterKeepPlaying = false;
+  this.running = false;
+  this.calculating = false;
+  this.clearTimer();
+};
+
+AIAgentController.prototype.handleGameStateChange = function () {
+  if (this.disabled) {
+    return;
+  }
+
+  if (this.gameManager.over) {
+    this.stopForGameOver();
+  } else if (this.gameManager.won && !this.gameManager.keepPlaying) {
+    this.suspendForWin();
+  }
+};
+
+AIAgentController.prototype.suspendForWin = function () {
+  this.resumeAfterKeepPlaying = this.resumeAfterKeepPlaying || this.running;
+  this.running = false;
+  this.calculating = false;
+  this.clearTimer();
+  this.hideToggle();
+};
+
+AIAgentController.prototype.stopForGameOver = function () {
+  this.resumeAfterKeepPlaying = false;
+  this.running = false;
+  this.calculating = false;
+  this.clearTimer();
+  this.hideToggle();
+};
+
+AIAgentController.prototype.continueAfterWin = function () {
+  if (this.disabled) {
+    return;
+  }
+
+  var shouldResume = this.resumeAfterKeepPlaying;
+  this.resumeAfterKeepPlaying = false;
+  this.showToggle();
+
+  if (shouldResume && !this.gameManager.over) {
+    this.start();
+  } else {
+    this.updateButtons();
+  }
+};
+
+AIAgentController.prototype.clearTimer = function () {
+  if (this.timer) {
+    window.clearTimeout(this.timer);
+    this.timer = null;
+  }
+};
+
+AIAgentController.prototype.hideToggle = function () {
+  if (this.toggleButton) {
+    this.toggleButton.style.display = "none";
+  }
+};
+
+AIAgentController.prototype.showToggle = function () {
+  if (this.toggleButton) {
+    this.toggleButton.style.display = "";
+  }
 };
 
 AIAgentController.prototype.scheduleNextMove = function (delay) {
@@ -518,7 +659,7 @@ AIAgentController.prototype.playStep = function () {
   }
 
   if (this.gameManager.isGameTerminated()) {
-    this.pause();
+    this.handleGameStateChange();
     return;
   }
 
@@ -534,7 +675,7 @@ AIAgentController.prototype.playStep = function () {
   this.gameManager.move(move);
 
   if (this.gameManager.isGameTerminated()) {
-    this.pause();
+    this.handleGameStateChange();
     return;
   }
 
@@ -542,11 +683,8 @@ AIAgentController.prototype.playStep = function () {
 };
 
 AIAgentController.prototype.updateButtons = function () {
-  if (this.startButton) {
-    this.startButton.classList.toggle("ai-active", this.running);
-  }
-
-  if (this.pauseButton) {
-    this.pauseButton.classList.toggle("ai-active", !this.running);
+  if (this.toggleButton) {
+    this.toggleButton.textContent = this.running ? "Stop" : "Start";
+    this.toggleButton.classList.toggle("ai-running", this.running);
   }
 };

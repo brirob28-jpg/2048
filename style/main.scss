@@ -461,16 +461,38 @@ hr {
   margin-bottom: 0;
 }
 
-.restart-button, .ai-start-button, .ai-pause-button {
+.game-controls {
+  float: right;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.restart-button {
   @include button;
   display: block;
   text-align: center;
-  float: right;
-  margin-left: 12px;
+  float: none;
 }
 
-.ai-active {
-  background: #9f8b77;
+.ai-toggle-button {
+  display: block;
+  border-radius: 3px;
+  padding: 0 20px;
+  text-decoration: none;
+  color: $bright-text-color;
+  height: 40px;
+  line-height: 42px;
+  text-align: center;
+  box-sizing: border-box;
+  width: 90px;
+  cursor: pointer;
+  background: #15803d;
+}
+
+.ai-toggle-button.ai-running {
+  background: #b91c1c;
 }
 
 .game-explanation {
@@ -517,28 +539,29 @@ hr {
 
   // Show intro and restart button side by side
   .game-intro {
-    width: 100%;
+    width: 55%;
     display: block;
     box-sizing: border-box;
     line-height: 1.65;
-    margin-bottom: 8px;
   }
 
-  .restart-button, .ai-start-button, .ai-pause-button {
-    width: 32%;
+  .game-controls {
+    width: 42%;
+    gap: 8px;
+  }
+
+  .restart-button {
+    width: 100%;
     padding: 0;
     display: block;
     box-sizing: border-box;
     margin-top: 2px;
-    margin-left: 2%;
   }
 
-  .ai-start-button, .ai-pause-button {
-    font-size: 13px;
-  }
-
-  .ai-pause-button {
-    margin-left: 0;
+  .ai-toggle-button {
+    width: 100%;
+    padding: 0;
+    margin-top: 0;
   }
 
   // Render the game field at the right width
